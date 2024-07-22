@@ -5,15 +5,15 @@ import numba as nb
 def filter(data,theta,num_particles,dt,rng,model,model_dim):
     '''Initialize the particle distribution'''
 
-    particles = np.zeros((num_particles,model_dim,len(data)),dtype = np.float_)
+    particles = np.zeros((num_particles,model_dim,len(data)),dtype = np.float64)
 
     #TODO Assumption here that observations are 1-D, will definitely need to change for the movement model
-    particle_observations = np.zeros((num_particles,len(data)),dtype=np.float_)
+    particle_observations = np.zeros((num_particles,len(data)),dtype=np.float64)
 
     particles[:,0,0] = rng.normal(size=(num_particles * model_dim,))
 
-    weights = np.zeros((num_particles,len(data)),dtype = np.float_)
-    likelihood = np.zeros((len(data),),dtype=np.float_)
+    weights = np.zeros((num_particles,len(data)),dtype = np.float64)
+    likelihood = np.zeros((len(data),),dtype=np.float64)
 
     for t,data_point in enumerate(data):
 
