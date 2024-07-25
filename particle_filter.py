@@ -22,9 +22,10 @@ def filter(data,theta,num_particles,dt,rng,model,model_dim):
         if(t > 0):
             particles,particle_observations = simulate(particles=particles,particle_observations=particle_observations,t = t,dt = dt,theta = theta,model = model,rng = rng,num_particles=num_particles)
         '''Resampling and weight computation'''
-        weights[:,t] = 1/np.sqrt(2 * np.pi * np.exp(theta[2])**2) * np.exp(-((data_point - particle_observations[:,t])**2)/(2 * np.exp(theta[2]) ** 2))
+        weights[:,t] = 1/np.sqrt(2 * np.pi * theta[2]**2) * np.exp(-((data_point - particle_observations[:,t])**2)/(2 * theta[2] ** 2))
 
-        #weights[:,t] = norm.pdf(x = data_point,loc = particle_observations[:,t], scale = np.exp(theta[2]))
+        #
+        # weights[:,t] = norm.pdf(x = data_point,loc = particle_observations[:,t], scale = theta[2])
 
         likelihood[t] = np.mean(weights[:,t])
 

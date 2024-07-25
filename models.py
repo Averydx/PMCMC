@@ -3,8 +3,8 @@ import numba as nb
 
 @nb.njit
 def OU_model(particles, observations, t, dt, theta, rng,num_particles):
-    particles[:,0,t] += -np.exp(theta[0]) * (particles[:,0,t] - theta[1]) * \
-    dt + np.sqrt(2 * np.exp(theta[0])) * np.exp(theta[2]) * rng.normal(size = (num_particles,),scale = np.sqrt(dt))
+    particles[:,0,t] += -theta[0] * (particles[:,0,t] - theta[1]) * \
+    dt + np.sqrt(2 * theta[0]) * theta[2] * rng.normal(size = (num_particles,),scale = np.sqrt(dt))
 
     observations[:,t] = particles[:,0,t]
 
@@ -13,16 +13,10 @@ def OU_model(particles, observations, t, dt, theta, rng,num_particles):
 @nb.njit
 def AR_model(particles, observations, t, dt, theta, rng,num_particles):
     particles[:,0,t] = theta[0] * particles[:,0,t] + rng.normal(size = (num_particles,),scale = theta[1]) 
-    observations[:,t] = particles[:,0,t] + rng.normal(size = (num_particles,),scale = theta[2])
+    observations[:,t] = particles[:,0,t]
 
     return particles, observations   
 
-@nb.njit
-def AR_PMCMC_model(particles, observations, t, dt, theta, rng,num_particles):
-    particles[:,0,t] = theta[0] * particles[:,0,t] + rng.normal(size = (num_particles,),scale = np.exp(theta[1])) 
-    observations[:,t] = particles[:,0,t] + rng.normal(size = (num_particles,),scale = np.exp(theta[2]))
-
-    return particles, observations
 
 def logistic_model(particles,observations,t,dt,theta,rng,num_particles):
     particles[:,0:2,t] += particles[:,2:,t] * particles[:,0:2,t] * (1 - particles[:,0:2,t]/theta) * dt
