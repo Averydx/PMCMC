@@ -1,5 +1,6 @@
 import numpy as np
 import numba as nb
+from scipy.stats import norm
 
 @nb.njit
 def filter(data,theta,num_particles,dt,rng,model,model_dim):
@@ -21,12 +22,13 @@ def filter(data,theta,num_particles,dt,rng,model,model_dim):
         if(t > 0):
             particles,particle_observations = simulate(particles=particles,particle_observations=particle_observations,t = t,dt = dt,theta = theta,model = model,rng = rng,num_particles=num_particles)
         '''Resampling and weight computation'''
-        ob_var = 1.**2
-        weights[:,t] = 1/np.sqrt(2 * np.pi * ob_var) * np.exp(-((data_point - particle_observations[:,t])**2)/(2 * ob_var))
+        weights[:,t] = 1/np.sqrt(2 * np.pi * np.exp(theta[2])**2) * np.exp(-((data_point - particle_observations[:,t])**2)/(2 * np.exp(theta[2]) ** 2))
+
+        #weights[:,t] = norm.pdf(x = data_point,loc = particle_observations[:,t], scale = np.exp(theta[2]))
 
         likelihood[t] = np.mean(weights[:,t])
 
-        weights[:,t] = (weights[:,t] / np.sum(weights[:,t])) #Normalization
+        weights[:,t] = weights[:,t] / np.sum(weights[:,t]) #Normalization
 
         particles[:,:,t] = resampling(particles[:,:,t],weights[:,t],rng)
 
@@ -54,5 +56,3 @@ def simulate(particles, particle_observations,t,dt,theta,model,rng,num_particles
         particles,particle_observations = model(particles, particle_observations, t, dt, theta, rng,num_particles)
 
     return particles,particle_observations
-
-        
