@@ -94,14 +94,13 @@ def SEIR_model(particles,observations,t,dt,theta,rng,num_particles):
     particles[:,3,t] = np.maximum(0.,particles[:,3,t] + new_ER + new_IR)
     particles[:,4,t] =  np.exp(A * np.log(particles[:,4,t]) - M + C * rng.standard_normal(size = (num_particles,)))#beta_sim(beta_par,t)#
 
-    observations[:,0,t] = particles[:,1,t]
+    observations[:,0,t] = new_E#particles[:,1,t]
 
     return particles,observations
 
-@nb.njit
 def SEIR_Obs(data_point, particle_observations, theta):
-    return 1/np.sqrt(2 * np.pi * 200**2) * np.exp(-((data_point - particle_observations[:,0])**2)/(2 * 200 ** 2))
-    #return nbinom.pmf(data_point, p = theta[3]/(particle_observations[:,0] + theta[3]), n = theta[3])
+    #return 1/np.sqrt(2 * np.pi * theta[2]**2) * np.exp(-((data_point - particle_observations[:,0])**2)/(2 * theta[2] ** 2))
+    return nbinom.pmf(data_point, p = 5/(particle_observations[:,0] + 5), n = 5)
 
 beta_par = {'b_0':0.4,'b_inf': 0.1, 'tau': 5,'T':20}
 
