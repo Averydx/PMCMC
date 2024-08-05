@@ -3,13 +3,13 @@ from numpy.typing import NDArray
 import numba as nb
 from scipy.stats import norm
 
-def filter(data,theta,num_particles,dt,rng,model,observation,model_dim,observation_dim):
+def filter(data,theta,num_particles,dt,rng,model,observation,model_dim,particle_init):
     '''Initialize the particle distribution'''
 
     particles = np.zeros((num_particles,model_dim,len(data)),dtype = np.float64)
 
     #TODO Assumption here that observations are 1-D, will definitely need to change for the movement model
-    particle_observations = np.zeros((num_particles,observation_dim,len(data)),dtype=np.float64)
+    particle_observations = np.zeros((num_particles,data.shape[1],data.shape[0]),dtype=np.float64)
 
     #particles[:,:,0] = np.ones(shape=(num_particles, model_dim,))
 
