@@ -12,7 +12,12 @@ def filter(data,theta,num_particles,dt,rng,model,observation,model_dim,observati
     particle_observations = np.zeros((num_particles,observation_dim,len(data)),dtype=np.float64)
 
     #particles[:,:,0] = np.ones(shape=(num_particles, model_dim,))
-    particles[:,0:4,0] = np.array([100_000,5,5,0])
+
+    compartment_init = rng.integers(0,5,size = (num_particles,2))
+
+    particles[:,0,0] = 100_000 - np.sum(compartment_init,axis = 1)
+    particles[:,1,0] = compartment_init[:,0]
+    particles[:,2,0] = compartment_init[:,1]
     particles[:,4,0] = rng.uniform(0.2,0.5,size = (num_particles,))
 
 

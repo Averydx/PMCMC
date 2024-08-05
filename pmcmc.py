@@ -5,7 +5,8 @@ from numpy.linalg import cholesky,LinAlgError
 
 def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data, rng, dt,model_dim,observation_dim = 1): 
 
-    MLE_Distribution = np.zeros((num_particles,model_dim,len(data)))
+    MLE_Particles = np.zeros((num_particles,model_dim,len(data)))
+    MLE_Observations = np.zeros((num_particles,observation_dim,len(data)))
 
     MLE = -50000
 
@@ -19,7 +20,7 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
     LL[0] = prior(init_theta) 
 
     if(np.isfinite(LL[0])):
-        particles,_,weights,likelihood = filter(data = data,
+        particles,particle_observations,weights,likelihood = filter(data = data,
                                 theta= theta[:,0],
                                 rng = rng,num_particles = num_particles,
                                 dt = dt, 
@@ -32,7 +33,8 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
         LL[0] += np.sum(likelihood)
 
         MLE = LL[0]
-        MLE_Distribution = particles
+        MLE_Particles = particles
+        MLE_Observations = particle_observations
 
     #create a zero vector to store the acceptance rate
     acc_record = np.zeros((iterations,))
@@ -52,7 +54,7 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
         LL_new = prior(theta_prop)
 
         if(np.isfinite(LL_new)):
-            particles,_,weights,likelihood = filter(data = data,
+            particles,particle_observations,weights,likelihood = filter(data = data,
                                     theta= theta_prop,
                                     rng = rng,
                                     num_particles = num_particles,
@@ -68,7 +70,8 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
 
             if(LL_new > MLE):
                 MLE = LL_new
-                MLE_Distribution = particles
+                MLE_Particles = particles
+                MLE_Observations = particle_observations
 
         ratio = (LL_new - LL[iter-1])
 
@@ -84,7 +87,7 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
 
         mu, cov = cov_update(cov,mu,theta[:,iter],iter)
 
-    return theta,LL,MLE_Distribution 
+    return theta,LL,MLE_Particles,MLE_Observations
 
 
 

@@ -67,7 +67,7 @@ def r_t(t):
 
 def SEIR_model(particles,observations,t,dt,theta,rng,num_particles):
 
-    gamma,eta = theta
+    gamma,eta,sig = theta
 
     new_E = rng.poisson((particles[:,4,t] * (particles[:, 1, t] + 0.1 * particles[:, 2, t]) * particles[:, 0, t])/np.sum(particles[:,:,t],axis = 1) * dt)
     new_I = rng.poisson((eta * particles[:,1,t]) * dt)
@@ -76,8 +76,8 @@ def SEIR_model(particles,observations,t,dt,theta,rng,num_particles):
     new_D = rng.poisson((0.004 * particles[:,2,t]) * dt)
 
     lam = 1/365
-    sig = 1.
     mu = -0.5
+
     A = np.exp(-lam * dt)
     M = mu * (np.exp(-lam * dt) - 1)
     C = sig * np.sqrt(1 - np.exp(-2 * lam * dt))
@@ -94,12 +94,12 @@ def SEIR_model(particles,observations,t,dt,theta,rng,num_particles):
     particles[:,3,t] = np.maximum(0.,particles[:,3,t] + new_ER + new_IR)
     particles[:,4,t] = np.exp(A * np.log(particles[:,4,t]) - M + C * rng.standard_normal(size = (num_particles,)))#beta_sim(beta_par,t)#
 
-    observations[:,0,t] = particles[:,2,t] #new_E #particles[:,1,t]#new_E#particles[:,1,t]
+    observations[:,0,t] = particles[:,2,t]#new_E#particles[:,1,t]
 
     return particles,observations
 
 def SEIR_Obs(data_point, particle_observations, theta):
-    return norm.logpdf(data_point, particle_observations[:,0],scale = 15)
+    return norm.logpdf(data_point, particle_observations[:,0],scale = 50)
     #return 1/np.sqrt(2 * np.pi * 1**2) * np.exp(-((data_point - particle_observations[:,0])**2)/(2 * 1 ** 2))
     #return nbinom.logpmf(data_point, p = 5/(particle_observations[:,0] + 5), n = 5)
 
