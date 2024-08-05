@@ -5,7 +5,9 @@ from numpy.linalg import cholesky,LinAlgError
 
 def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data, rng, dt,model_dim,observation_dim = 1): 
 
-    pf_means = np.zeros((model_dim,len(data),iterations))
+    MLE_Distribution = np.zeros((num_particles,model_dim,len(data)))
+
+    MLE = -50000
 
     theta = np.zeros((len(init_theta),iterations))
     LL = np.zeros((iterations,))
@@ -17,7 +19,7 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
     LL[0] = prior(init_theta) 
 
     if(np.isfinite(LL[0])):
-        particles,weights,likelihood = filter(data = data,
+        particles,_,weights,likelihood = filter(data = data,
                                 theta= theta[:,0],
                                 rng = rng,num_particles = num_particles,
                                 dt = dt, 
@@ -26,8 +28,11 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
                                 model_dim=model_dim,
                                 observation_dim=observation_dim)
         
-        pf_means[:,:,0] = pf_mean_calc(particles,model_dim,weights)
-        LL[0] += np.sum(np.log(likelihood))
+
+        LL[0] += np.sum(likelihood)
+
+        MLE = LL[0]
+        MLE_Distribution = particles
 
     #create a zero vector to store the acceptance rate
     acc_record = np.zeros((iterations,))
@@ -47,7 +52,7 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
         LL_new = prior(theta_prop)
 
         if(np.isfinite(LL_new)):
-            particles,weights,likelihood = filter(data = data,
+            particles,_,weights,likelihood = filter(data = data,
                                     theta= theta_prop,
                                     rng = rng,
                                     num_particles = num_particles,
@@ -57,9 +62,13 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
                                     model_dim=model_dim,
                                     observation_dim=observation_dim)
             
-            pf_means[:,:,iter] = pf_mean_calc(particles,model_dim,weights)
             
-            LL_new += np.sum(np.log(likelihood))
+            
+            LL_new += np.sum((likelihood))
+
+            if(LL_new > MLE):
+                MLE = LL_new
+                MLE_Distribution = particles
 
         ratio = (LL_new - LL[iter-1])
 
@@ -75,7 +84,7 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
 
         mu, cov = cov_update(cov,mu,theta[:,iter],iter)
 
-    return theta,LL,pf_means 
+    return theta,LL,MLE_Distribution 
 
 
 
@@ -88,10 +97,3 @@ def cov_update(cov, mu, theta_val,iteration):
     cov = (1.0 - g) * cov + g * np.outer(m_theta,m_theta.T)
 
     return mu,cov
-
-def pf_mean_calc(particles,model_dim,weights):
-    means = np.zeros((model_dim,weights.shape[1]))
-    for axis in range(model_dim):
-        means[axis,:] = np.average(particles[:,axis,:],weights=weights,axis = 0)
-        
-    return means
