@@ -8,18 +8,9 @@ def filter(data,theta,num_particles,dt,rng,model,observation,model_dim,particle_
 
     particles = np.zeros((num_particles,model_dim,len(data)),dtype = np.float64)
 
-    #TODO Assumption here that observations are 1-D, will definitely need to change for the movement model
-    particle_observations = np.zeros((num_particles,data.shape[1],data.shape[0]),dtype=np.float64)
+    particle_observations = np.zeros((num_particles,data.shape[1] if len(data.shape ) > 1 else 1,data.shape[0]),dtype=np.float64)
 
-    #particles[:,:,0] = np.ones(shape=(num_particles, model_dim,))
-
-    compartment_init = rng.integers(0,5,size = (num_particles,2))
-
-    particles[:,0,0] = 100_000 - np.sum(compartment_init,axis = 1)
-    particles[:,1,0] = compartment_init[:,0]
-    particles[:,2,0] = compartment_init[:,1]
-    particles[:,4,0] = rng.uniform(0.2,0.5,size = (num_particles,))
-
+    particles[:,:,0] = particle_init(num_particles,model_dim,rng)
 
     weights = np.zeros((num_particles,len(data)),dtype = np.float64)
     likelihood = np.zeros((len(data),),dtype=np.float64)

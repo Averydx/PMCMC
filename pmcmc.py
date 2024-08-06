@@ -3,10 +3,10 @@ import numba as nb
 from particle_filter import filter
 from numpy.linalg import cholesky,LinAlgError
 
-def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data, rng, dt,model_dim,observation_dim = 1): 
+def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data, rng, dt,model_dim, particle_init): 
 
     MLE_Particles = np.zeros((num_particles,model_dim,len(data)))
-    MLE_Observations = np.zeros((num_particles,observation_dim,len(data)))
+    MLE_Observations = np.zeros((num_particles,data.shape[1] if len(data.shape ) > 1 else 1,data.shape[0]),dtype=np.float64)
 
     MLE = -50000
 
@@ -27,7 +27,7 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
                                 model = model,
                                 observation=observation,
                                 model_dim=model_dim,
-                                observation_dim=observation_dim)
+                                particle_init=particle_init)
         
 
         LL[0] += np.sum(likelihood)
@@ -62,7 +62,7 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
                                     model = model,
                                     observation=observation,
                                     model_dim=model_dim,
-                                    observation_dim=observation_dim)
+                                    particle_init=particle_init)
             
             
             
