@@ -41,7 +41,7 @@ def filter(data,theta,num_particles,dt,rng,model,observation,model_dim,particle_
                                                        ,model = model,
                                                        rng = rng,
                                                        num_particles=num_particles)
-            
+
         '''Resampling and weight computation'''
         weights[:,t] = observation(data_point = data_point,
                                    particle_observations = particle_observations[:,:,t],
