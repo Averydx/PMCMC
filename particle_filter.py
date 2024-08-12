@@ -4,7 +4,21 @@ import numba as nb
 from scipy.stats import norm
 
 def filter(data,theta,num_particles,dt,rng,model,observation,model_dim,particle_init):
-    '''Initialize the particle distribution'''
+    '''Initialize the particle distribution, observations and weights. 
+    
+    Args: 
+        data: A (observation_dim,T) matrix of observations of the system. 
+        theta: Vector of system parameters, used in the observation density and transition density. 
+        num_particles: How many particles to use to perform inference. 
+        dt: Discretization step of a continuous time model, for discrete SSMs set to 1.  
+        rng: An instance of the NumPy Generator class. Used for random number generation. 
+        model: 
+
+
+    Returns: 
+        The vector of partial sums of δ.  
+
+    '''
 
     particles = np.zeros((num_particles,model_dim,len(data)),dtype = np.float64)
 
@@ -33,20 +47,24 @@ def filter(data,theta,num_particles,dt,rng,model,observation,model_dim,particle_
                                    particle_observations = particle_observations[:,:,t],
                                    theta = theta)
 
-        likelihood[t] = jacob(weights[:,t])[-1] - np.log(num_particles)
+        likelihood[t] = jacob(weights[:,t])[-1] - np.log(num_particles) # Computes the Monte Carlo estimate of the likeihood. I.E. P(y_{1:T})
 
-        weights[:,t] = log_norm(weights[:,t]) #/ np.sum(weights[:,t]) #Normalization
+        weights[:,t] = log_norm(weights[:,t]) #/ np.sum(weights[:,t]) #Normalization step
 
-        particles[:,:,t] = log_resampling(particles[:,:,t],weights[:,t],rng)
+        particles[:,:,t] = log_resampling(particles[:,:,t],weights[:,t],rng) #Resampling the particles
 
     return particles,particle_observations,weights,likelihood
 
 @nb.njit
 def resampling(particles,weights,rng): 
+
+    '''Systematic resampling algorithm, the njit decorator is important here as it gives a significant speedup. Time 
+    complexity is O(n), as opposed to O(nlog(n)) in multinomial resampling. '''
+
     indices = np.zeros(len(weights),dtype = np.int_) #initialize array to hold the indices
     cdf = np.cumsum(weights) #create cdf
 
-    u = rng.uniform(0,1/len(weights)) #random number between 1 and 1/n, only drawn once vs the n 
+    u = rng.uniform(0,1/len(weights)) #random number between 1 and 1/n, only drawn once vs the n draws in multinomial resampling
     i = 0
     for j in range(0,len(weights)): 
         r = (u + 1/len(weights) * j)
@@ -58,10 +76,14 @@ def resampling(particles,weights,rng):
 
 @nb.njit
 def log_resampling(particles,weights,rng): 
-    indices = np.zeros(len(weights),dtype = np.int_) #initialize array to hold the indices
-    cdf = jacob(weights) #create cdf
 
-    u = rng.uniform(0,1/len(weights)) #random number between 1 and 1/n, only drawn once vs the n 
+    '''Systematic resampling algorithm in log domain, the njit decorator is important here as it gives a significant speedup. Time 
+    complexity is O(n), as opposed to O(nlog(n)) in multinomial resampling. '''
+
+    indices = np.zeros(len(weights),dtype = np.int_) #initialize array to hold the indices
+    cdf = jacob(weights) #create log-cdf
+
+    u = rng.uniform(0,1/len(weights)) #random number between 1 and 1/n, only drawn once vs the n draws in multinomial resampling
     i = 0
     for j in range(0,len(weights)): 
         r = np.log(u + 1/len(weights) * j)
