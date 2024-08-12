@@ -1,0 +1,15 @@
+starting job: /home/aad473/PMCMC/pmcmc_script.py
+which python: /home/aad473/PMCMC/.venv/bin/python (Python 3.11.5)
+Population per location:  [500 200]
+Runtime for 1 particles was 10.125630139373243 secs
+Traceback (most recent call last):
+  File "/home/aad473/PMCMC/pmcmc_script.py", line 59, in <module>
+    particles, particle_observations,weights,likelihood = filter(data = data, theta = theta_test, num_particles = 100, dt = 1., rng = rng, model = model,model_dim = 6,particle_init = mm_init,observation = mm_obs)
+                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/aad473/PMCMC/particle_filter.py", line 46, in filter
+    weights[:,t] = observation(data_point = data_point,
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/aad473/PMCMC/mm_helper_funcs.py", line 174, in mm_obs
+    weights[p] = multivariate_normal.logpdf(data_point, particle_observations[p,:],np.eye(len(data_point))) 
+                 ^^^^^^^^^^^^^^^^^^^
+NameError: name 'multivariate_normal' is not defined
