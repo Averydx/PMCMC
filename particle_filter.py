@@ -12,8 +12,10 @@ def filter(data,theta,num_particles,dt,rng,model,observation,model_dim,particle_
         num_particles: How many particles to use to perform inference. 
         dt: Discretization step of a continuous time model, for discrete SSMs set to 1.  
         rng: An instance of the NumPy Generator class. Used for random number generation. 
-        model: 
-
+        model: A python function describing the transition map for the model. Arguments are (particles,observations,t,dt,theta,rng,num_particles)
+        observation_model: A python function describing the observation density/measure. Arguments are (data_point, particle_observations, theta)
+        model_dim: dimension of the model 
+        particle_init: Initializer function for the particles.
 
     Returns: 
         The vector of partial sums of δ.  
