@@ -5,6 +5,20 @@ from numpy.linalg import cholesky,LinAlgError
 
 def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data, rng, dt,model_dim, particle_init): 
 
+    '''Initialize the particle distribution, observations and weights. 
+    
+    Args: 
+        iterations: Number of MCMC steps to run. 
+        num_particles: Number of particles to use for the underlying Monte Carlo estimate of the likelihood. 
+        init_theta: Initial guess of the parameter values to be inferred. 
+        prior: The Bayesian prior on the parameter vector theta. Takes theta as an argument and returns a probability. 
+        model: 
+
+    Returns: 
+        The vector of partial sums of δ.  
+
+    '''
+
     MLE_Particles = np.zeros((num_particles,model_dim,len(data)))
     MLE_Observations = np.zeros((num_particles,data.shape[1] if len(data.shape ) > 1 else 1,data.shape[0]),dtype=np.float64)
 
