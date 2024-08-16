@@ -28,7 +28,7 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
     LL = np.zeros((iterations,))
 
     mu = np.zeros(len(init_theta))
-    cov = np.eye(len(init_theta))
+    cov = 0.01 * np.eye(len(init_theta))
 
     theta[:,0] = init_theta
     LL[0] = prior(init_theta) 
@@ -60,9 +60,10 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
         if(iter % 10 == 0):
             #print the acceptance rate and likelihood every 10 iterations
             print(f"iteration: {iter}" + f"| Acceptance rate: {np.sum(acc_record[:iter])/iter}" + f"| Log-Likelihood: {LL[iter-1]}" + f"| Proposal {theta[:,iter - 1]}")
+            #print(cov)
 
         z = rng.standard_normal((len(theta[:,iter-1])))
-        L = cholesky((2.38**2/len(theta[:,iter - 1])) * cov) 
+        L = cholesky((2.38**2/len(theta[:,iter - 1])) * cov)
         theta_prop = theta[:,iter - 1] + L @ z
 
         LL_new = prior(theta_prop)
@@ -95,11 +96,16 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
             theta[:,iter] = theta_prop
             LL[iter] = LL_new
             acc_record[iter] = 1
+
+            # if(iter > 1000):
+            #     mu, cov = cov_update(cov,mu,theta[:,iter],iter)
         else: 
             theta[:,iter] = theta[:,iter - 1]
             LL[iter] = LL[iter-1]
 
-        mu, cov = cov_update(cov,mu,theta[:,iter],iter)
+        #cov = np.diag([0.1,1.,1.]) @ np.diag(np.mean(theta[:,:iter],axis = 1))
+
+        
 
     return theta,LL,MLE_Particles,MLE_Observations
 
@@ -108,9 +114,10 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
 @nb.njit
 def cov_update(cov, mu, theta_val,iteration):
 
-    g = (iteration + 1) ** (-0.6)
+    g = (iteration + 1) ** (-0.4)
     mu = (1.0 - g) * mu + g * theta_val
     m_theta = theta_val - mu
     cov = (1.0 - g) * cov + g * np.outer(m_theta,m_theta.T)
 
     return mu,cov
+
