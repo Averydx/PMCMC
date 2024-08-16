@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from time import perf_counter
 from particle_filter import filter
 from pmcmc import PMCMC
+from functools import partial
 from mm_helper_funcs import *
 
 rng = np.random.default_rng(0)
