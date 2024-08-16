@@ -1,10 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from numba import njit
 from time import perf_counter
 from particle_filter import filter
-from functools import partial
-from scipy.stats import multivariate_normal
 from pmcmc import PMCMC
 from mm_helper_funcs import *
 
