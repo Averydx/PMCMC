@@ -28,7 +28,8 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
     LL = np.zeros((iterations,))
 
     mu = np.zeros(len(init_theta))
-    cov = 0.01 * np.eye(len(init_theta))
+    #cov = 0.01 * np.eye(len(init_theta))
+    cov = np.diag(init_theta)
 
     theta[:,0] = init_theta
     LL[0] = prior(init_theta) 
@@ -62,9 +63,12 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
             print(f"iteration: {iter}" + f"| Acceptance rate: {np.sum(acc_record[:iter])/iter}" + f"| Log-Likelihood: {LL[iter-1]}" + f"| Proposal {theta[:,iter - 1]}")
             #print(cov)
 
+        cov = np.diag(theta[:,iter - 1])
         z = rng.standard_normal((len(theta[:,iter-1])))
         L = cholesky((2.38**2/len(theta[:,iter - 1])) * cov)
-        theta_prop = theta[:,iter - 1] + L @ z
+
+        learning_rate = 0.01
+        theta_prop = theta[:,iter - 1] + (learning_rate * L) @ z
 
         LL_new = prior(theta_prop)
 
