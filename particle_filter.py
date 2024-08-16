@@ -103,7 +103,7 @@ def simulate(particles, particle_observations,t,dt,theta,model,rng,num_particles
     return particles,particle_observations
 
 @nb.njit
-def jacob(δ:NDArray[np.float_])->NDArray[np.float_]:
+def jacob(δ:NDArray[np.float64])->NDArray[np.float64]:
     """The jacobian logarithm, used in log likelihood normalization and resampling processes
     δ will be an array of values. 
     

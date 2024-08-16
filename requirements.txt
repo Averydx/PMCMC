@@ -1,6 +1,0 @@
-matplotlib==3.6.2
-numpy==1.25.1
-pandas==1.5.3
-particles
-scipy
-numba 
