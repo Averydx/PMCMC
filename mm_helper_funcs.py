@@ -172,5 +172,5 @@ def mm_init(num_particles, model_dim, rng):
 def mm_obs(data_point, particle_observations, theta):
     weights = np.zeros(len(particle_observations))
     for p in range(len(weights)):
-        weights[p] = multivariate_normal.logpdf(data_point, particle_observations[p,:],np.eye(len(data_point))) 
+        weights[p] = multivariate_normal.logpdf(data_point, particle_observations[p,:],np.diag(data_point ** 2)) 
     return weights

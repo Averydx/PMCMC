@@ -1,9 +1,8 @@
 import numpy as np
 from numpy.typing import NDArray
 import numba as nb
-from scipy.stats import norm
 
-def filter(data,theta,num_particles,dt,rng,model,observation,model_dim,particle_init):
+def filter(data,theta,num_particles,dt,rng,model,observation_model,model_dim,particle_initializer):
     '''Initialize the particle distribution, observations and weights. 
     
     Args: 
@@ -15,23 +14,21 @@ def filter(data,theta,num_particles,dt,rng,model,observation,model_dim,particle_
         model: A python function describing the transition map for the model. Arguments are (particles,observations,t,dt,theta,rng,num_particles)
         observation_model: A python function describing the observation density/measure. Arguments are (data_point, particle_observations, theta)
         model_dim: dimension of the model 
-        particle_init: Initializer function for the particles.
+        particle_initializer: Initializer function for the particles.
 
     Returns: 
         The vector of partial sums of δ.  
 
     '''
 
-    particles = np.zeros((num_particles,model_dim,len(data)),dtype = np.float64)
+    particles = np.zeros((num_particles,model_dim,data.shape[1]),dtype = np.float64)
+    particle_observations = np.zeros((num_particles,data.shape[0],data.shape[1]),dtype=np.float64)
+    particles[:,:,0] = particle_initializer(num_particles,model_dim,rng)
 
-    particle_observations = np.zeros((num_particles,data.shape[1] if len(data.shape ) > 1 else 1,data.shape[0]),dtype=np.float64)
+    weights = np.zeros((num_particles,data.shape[1]),dtype = np.float64)
+    likelihood = np.zeros((num_particles,data.shape[1]),dtype=np.float64)
 
-    particles[:,:,0] = particle_init(num_particles,model_dim,rng)
-
-    weights = np.zeros((num_particles,len(data)),dtype = np.float64)
-    likelihood = np.zeros((len(data),),dtype=np.float64)
-
-    for t,data_point in enumerate(data):
+    for t,data_point in enumerate(data.T):
 
         '''Simulation/forecast step for all t > 0'''
         if(t > 0):
@@ -45,14 +42,13 @@ def filter(data,theta,num_particles,dt,rng,model,observation,model_dim,particle_
                                                        num_particles=num_particles)
 
         '''Resampling and weight computation'''
-        weights[:,t] = observation(data_point = data_point,
+        weights[:,t] = observation_model(data_point = data_point,
                                    particle_observations = particle_observations[:,:,t],
                                    theta = theta)
 
-        likelihood[t] = jacob(weights[:,t])[-1] - np.log(num_particles) # Computes the Monte Carlo estimate of the likeihood. I.E. P(y_{1:T})
-
-        weights[:,t] = log_norm(weights[:,t]) #/ np.sum(weights[:,t]) #Normalization step
-
+        jacob_sums = jacob(weights[:,t]) #Only performing this computation once to amortize the cost. 
+        likelihood[t] = jacob_sums[-1] - np.log(num_particles) # Computes the Monte Carlo estimate of the likeihood. I.E. P(y_{1:T})
+        weights[:,t] -= jacob_sums[-1] #Normalization step
         particles[:,:,t] = log_resampling(particles[:,:,t],weights[:,t],rng) #Resampling the particles
 
     return particles,particle_observations,weights,likelihood
@@ -83,7 +79,7 @@ def log_resampling(particles,weights,rng):
     complexity is O(n), as opposed to O(nlog(n)) in multinomial resampling. '''
 
     indices = np.zeros(len(weights),dtype = np.int_) #initialize array to hold the indices
-    cdf = jacob(weights) #create log-cdf
+    cdf = jacob(weights)
 
     u = rng.uniform(0,1/len(weights)) #random number between 1 and 1/n, only drawn once vs the n draws in multinomial resampling
     i = 0
@@ -120,10 +116,3 @@ def jacob(δ:NDArray[np.float64])->NDArray[np.float64]:
     for i in range(1,n):
         Δ[i] = max(δ[i],Δ[i-1]) + np.log(1 + np.exp(-1*np.abs(δ[i] - Δ[i-1])))
     return(Δ)
-
-@nb.njit
-def log_norm(log_weights:NDArray): 
-    '''normalizes the probability space using the jacobian logarithm as defined in jacob() '''
-    norm = (jacob(log_weights)[-1])
-    log_weights -= norm
-    return log_weights
