@@ -3,7 +3,7 @@ import numba as nb
 from particle_filter import filter
 from numpy.linalg import cholesky,LinAlgError
 
-def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data, rng, dt,model_dim, particle_init): 
+def PMCMC(iterations, num_particles, init_theta, prior, model, observation_model, data, rng, dt,model_dim, particle_initializer): 
 
     '''Initialize the particle distribution, observations and weights. 
     
@@ -19,8 +19,8 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
 
     '''
 
-    MLE_Particles = np.zeros((num_particles,model_dim,len(data)))
-    MLE_Observations = np.zeros((num_particles,data.shape[1] if len(data.shape ) > 1 else 1,data.shape[0]),dtype=np.float64)
+    MLE_Particles = np.zeros((num_particles,model_dim,data.shape[1]))
+    MLE_Observations = np.zeros((num_particles,data.shape[0],data.shape[1]),dtype=np.float64)
 
     MLE = -50000
 
@@ -40,9 +40,9 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
                                 rng = rng,num_particles = num_particles,
                                 dt = dt, 
                                 model = model,
-                                observation=observation,
+                                observation_model=observation_model,
                                 model_dim=model_dim,
-                                particle_init=particle_init)
+                                particle_initializer=particle_initializer)
         
 
         LL[0] += np.sum(likelihood)
@@ -61,8 +61,8 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
         if(iter % 10 == 0):
             #print the acceptance rate and likelihood every 10 iterations
             print(f"iteration: {iter}" + f"| Acceptance rate: {np.sum(acc_record[:iter])/iter}" + f"| Log-Likelihood: {LL[iter-1]}" + f"| Proposal {theta[:,iter - 1]}")
-            #print(cov)
 
+        '''Generating the next proposal using the cholesky decompostion'''
         cov = np.diag(theta[:,iter - 1])
         z = rng.standard_normal((len(theta[:,iter-1])))
         L = cholesky((2.38**2/len(theta[:,iter - 1])) * cov)
@@ -79,14 +79,15 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
                                     num_particles = num_particles,
                                     dt = dt,
                                     model = model,
-                                    observation=observation,
+                                    observation_model=observation_model,
                                     model_dim=model_dim,
-                                    particle_init=particle_init)
+                                    particle_initializer=particle_initializer)
             
             
             
             LL_new += np.sum((likelihood))
 
+            '''Store the running maximum likelihood estimate'''
             if(LL_new > MLE):
                 MLE = LL_new
                 MLE_Particles = particles
@@ -117,6 +118,9 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation, data
 
 @nb.njit
 def cov_update(cov, mu, theta_val,iteration):
+
+    '''Adaptive update step, geometric cooling g ensures ergodicity of the markov chain 
+    as the iteration count goes to infinity. '''
 
     g = (iteration + 1) ** (-0.4)
     mu = (1.0 - g) * mu + g * theta_val
