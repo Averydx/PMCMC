@@ -1,18 +1,79 @@
 import numpy as np
-from numpy.typing import NDArray
 import numba as nb
 
-def filter(data,theta,num_particles,dt,rng,model,observation_model,model_dim,particle_initializer):
-    '''Initialize the particle distribution, observations and weights. 
+from numpy.typing import NDArray
+from numpy.random import Generator 
+from typing import Dict
+from functools import partial
+
+def particlefilter(data:NDArray[np.float64],model_params:NDArray[np.float64],pf_params:Dict,rng:Generator,req_jit = False):
+    p_filter = pf_validator(data,model_params,pf_params,rng,req_jit) #mild shape enforcement and checking of parameters.
+
+    particles,particle_observations,weights,likelihood = p_filter(
+    data,
+    model_params,
+    rng = rng,
+    )
     
+    return {'particle_distribution':particles,'particle_observations':particle_observations,'log_weights':weights,'Log_likelihood':likelihood}
+
+def pf_validator(data:NDArray[np.float64],model_params:NDArray[np.float64],pf_params:Dict,rng:Generator,req_jit:bool = False):
+    '''Checks if the arguments being passed to the particle filter are of the correct type and shape for the specified model.'''
+
+    #First check the data shape is consistent with (m x T)
+    if(len(data.shape) < 2):
+        raise ValueError('Data shape must be m x T, where m represents the dimension of a single data point and T the length of the time series.')
+    
+    #Check the Generator is an instance of np.random.Generator
+    if not isinstance(rng,Generator):
+        raise AttributeError('The generator must be a NumPy Generator object as defined in np.random.')
+    
+    #Check mandatory keys for particle filtering specification.
+    key_list = ['num_particles', 'dt','model','observation_model','model_dim','particle_initializer'] 
+    for key in key_list:
+        if not (key in pf_params.keys()):
+            raise AttributeError(f'Required key {key} not found in pf_params.') 
+        
+    #Check if the provided functions are amenable to jit compilation
+    jit_keys = ['observation_model','model','particle_initializer']
+    if(req_jit):
+        for key in jit_keys: 
+            try: 
+                pf_params[key] = nb.jit(pf_params[key], nopython=True)
+            except: 
+                raise 
+
+    p_filter = nb.njit(filter_internal) if req_jit else filter_internal
+    p_filter = partial(p_filter,
+                       num_particles = pf_params['num_particles'],
+                       dt = pf_params['dt'],
+                       model = pf_params['model'],
+                       observation_model = pf_params['observation_model'],
+                       model_dim = pf_params['model_dim'],
+                       particle_initializer = pf_params['particle_initializer']
+                       )
+
+    return p_filter
+
+def filter_internal(data:NDArray[np.float64],model_params:NDArray[np.float64],
+                    num_particles,
+                    dt,
+                    rng,
+                    model,
+                    observation_model,
+                    model_dim,
+                    particle_initializer):
+
+    '''Initialize the particle distribution, observations and weights. 
+
     Args: 
         data: A (observation_dim,T) matrix of observations of the system. 
-        theta: Vector of system parameters, used in the observation density and transition density. 
+        model_params: Vector of system parameters, used in the observation density and transition density. 
         num_particles: How many particles to use to perform inference. 
         dt: Discretization step of a continuous time model, for discrete SSMs set to 1.  
         rng: An instance of the NumPy Generator class. Used for random number generation. 
-        model: A python function describing the transition map for the model. Arguments are (particles,observations,t,dt,theta,rng,num_particles)
-        observation_model: A python function describing the observation density/measure. Arguments are (data_point, particle_observations, theta)
+        model: A python function describing the transition map for the model. Arguments are (particles,observations,t,dt,model_params,rng,num_particles)
+        observation_model: A python function describing the observation density/measure. Arguments are (data_point, particle_observations, model_params)
         model_dim: dimension of the model 
         particle_initializer: Initializer function for the particles.
 
@@ -26,30 +87,29 @@ def filter(data,theta,num_particles,dt,rng,model,observation_model,model_dim,par
     particles[:,:,0] = particle_initializer(num_particles,model_dim,rng)
 
     weights = np.zeros((num_particles,data.shape[1]),dtype = np.float64)
-    likelihood = np.zeros((num_particles,data.shape[1]),dtype=np.float64)
+    likelihood = np.zeros((data.shape[1],),dtype=np.float64)
 
     for t,data_point in enumerate(data.T):
 
         '''Simulation/forecast step for all t > 0'''
         if(t > 0):
-            particles,particle_observations = simulate(particles=particles,
-                                                       particle_observations=particle_observations,
-                                                       t = t,
-                                                       dt = dt,
-                                                       theta = theta
-                                                       ,model = model,
-                                                       rng = rng,
-                                                       num_particles=num_particles)
+            particles[:,:,t] = particles[:,:,t-1]
+            for _ in range(int(1/dt)):
+                particles,particle_observations = model(particles, particle_observations, t, dt, model_params, rng)
 
         '''Resampling and weight computation'''
         weights[:,t] = observation_model(data_point = data_point,
                                    particle_observations = particle_observations[:,:,t],
-                                   theta = theta)
+                                   model_params = model_params)
 
         jacob_sums = jacob(weights[:,t]) #Only performing this computation once to amortize the cost. 
-        likelihood[t] = jacob_sums[-1] - np.log(num_particles) # Computes the Monte Carlo estimate of the likeihood. I.E. P(y_{1:T})
+
+        likelihood[t] = jacob_sums[-1] - np.log(num_particles) # Computes the Monte Carlo estimate of the likeihood. I.E. log(P(y_{1:T}))
+
         weights[:,t] -= jacob_sums[-1] #Normalization step
-        particles[:,:,t] = log_resampling(particles[:,:,t],weights[:,t],rng) #Resampling the particles
+
+        indices = log_resampling(particles[:,:,t],weights[:,t],rng) #log_resampling returns a list of indices
+        #particle_observations[:,:,t] = particle_observations[indices,:,t]
 
     return particles,particle_observations,weights,likelihood
 
@@ -89,14 +149,9 @@ def log_resampling(particles,weights,rng):
             i += 1
         indices[j] = i
 
-    return particles[indices,:]
+    particles[:,:] = particles[indices,:] 
 
-def simulate(particles, particle_observations,t,dt,theta,model,rng,num_particles):      
-    particles[:,:,t] = particles[:,:,t-1]
-    for _ in range(int(1/dt)):
-        particles,particle_observations = model(particles, particle_observations, t, dt, theta, rng,num_particles)
-
-    return particles,particle_observations
+    return indices
 
 @nb.njit
 def jacob(δ:NDArray[np.float64])->NDArray[np.float64]:

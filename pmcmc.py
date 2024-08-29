@@ -1,10 +1,37 @@
 import numpy as np
 import numba as nb
-from particle_filter import filter
+from particle_filter import pf_validator
 from numpy.linalg import cholesky,LinAlgError
 
-def PMCMC(iterations, num_particles, init_theta, prior, model, observation_model, data, rng, dt,model_dim, particle_initializer): 
+def pmcmc_validator(data,pmcmc_params,pf_params,rng,req_jit):
+    #Check mandatory keys for particle filtering specification.
+    key_list = ['iterations','init_params','prior','init_cov'] 
+    for key in key_list:
+        if not (key in pmcmc_params.keys()):
+            raise AttributeError(f'Required key {key} not found in pmcmc_params.') 
 
+    if((pmcmc_params['init_params'].shape[0] != pmcmc_params['init_cov'].shape[0]) or (pmcmc_params['init_params'].shape[0] != pmcmc_params['init_cov'].shape[1])):
+        raise AttributeError('init_cov shape must match init_params.')
+
+    p_filter = pf_validator(data,pmcmc_params['init_params'],pf_params,rng,req_jit)
+
+    return p_filter
+
+def particlemcmc(data,pmcmc_params,pf_params,rng,req_jit = False,adaptive = False): 
+    p_filter = pmcmc_validator(data,pmcmc_params,pf_params,rng,req_jit)
+    param_set,LL,MLE_Particles,MLE_Observations = particlemcmc_internal(data,
+                          num_particles = pf_params['num_particles'],
+                          model_dim = pf_params['model_dim'],
+                          init_params = pmcmc_params['init_params'],
+                          prior = pmcmc_params['prior'],
+                          iterations = pmcmc_params['iterations'],
+                          rng = rng,
+                          p_filter=p_filter
+                          )
+   
+    return {'accepted_params':param_set,'Log Likelihood':LL,'MLE_particle_dist':MLE_Particles,'MLE_particle_observations':MLE_Observations}
+
+def particlemcmc_internal(data,num_particles,model_dim,init_params,prior,iterations,rng,p_filter):
     '''Initialize the particle distribution, observations and weights. 
     
     Args: 
@@ -24,25 +51,21 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation_model
 
     MLE = -50000
 
-    theta = np.zeros((len(init_theta),iterations))
+    theta = np.zeros((len(init_params),iterations))
     LL = np.zeros((iterations,))
 
-    mu = np.zeros(len(init_theta))
+    mu = np.zeros(len(init_params))
     #cov = 0.01 * np.eye(len(init_theta))
-    cov = np.diag(init_theta)
+    cov = np.diag(init_params)
 
-    theta[:,0] = init_theta
-    LL[0] = prior(init_theta) 
+    theta[:,0] = init_params
+    LL[0] = prior(init_params) 
 
     if(np.isfinite(LL[0])):
-        particles,particle_observations,weights,likelihood = filter(data = data,
+        particles,particle_observations,weights,likelihood = p_filter(
+                                data = data,
                                 theta= theta[:,0],
-                                rng = rng,num_particles = num_particles,
-                                dt = dt, 
-                                model = model,
-                                observation_model=observation_model,
-                                model_dim=model_dim,
-                                particle_initializer=particle_initializer)
+                                rng = rng)
         
 
         LL[0] += np.sum(likelihood)
@@ -73,15 +96,10 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation_model
         LL_new = prior(theta_prop)
 
         if(np.isfinite(LL_new)):
-            particles,particle_observations,weights,likelihood = filter(data = data,
+            particles,particle_observations,weights,likelihood = filter(
+                                    data = data,
                                     theta= theta_prop,
-                                    rng = rng,
-                                    num_particles = num_particles,
-                                    dt = dt,
-                                    model = model,
-                                    observation_model=observation_model,
-                                    model_dim=model_dim,
-                                    particle_initializer=particle_initializer)
+                                    rng = rng)
             
             
             
@@ -108,12 +126,10 @@ def PMCMC(iterations, num_particles, init_theta, prior, model, observation_model
             theta[:,iter] = theta[:,iter - 1]
             LL[iter] = LL[iter-1]
 
-        #cov = np.diag([0.1,1.,1.]) @ np.diag(np.mean(theta[:,:iter],axis = 1))
 
         
 
     return theta,LL,MLE_Particles,MLE_Observations
-
 
 
 @nb.njit
