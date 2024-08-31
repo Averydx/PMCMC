@@ -5,7 +5,7 @@ from numpy.linalg import cholesky,LinAlgError
 
 def pmcmc_validator(data,pmcmc_params,pf_params,rng,req_jit):
     #Check mandatory keys for particle filtering specification.
-    key_list = ['iterations','init_params','prior','init_cov'] 
+    key_list = ['iterations','init_params','prior','init_cov','burn_in'] 
     for key in key_list:
         if not (key in pmcmc_params.keys()):
             raise AttributeError(f'Required key {key} not found in pmcmc_params.') 
@@ -26,12 +26,15 @@ def particlemcmc(data,pmcmc_params,pf_params,rng,req_jit = False,adaptive = Fals
                           prior = pmcmc_params['prior'],
                           iterations = pmcmc_params['iterations'],
                           rng = rng,
-                          p_filter=p_filter
+                          p_filter=p_filter,
+                          adaptive=adaptive,
+                          init_cov= pmcmc_params['init_cov'],
+                          burn_in = pmcmc_params['burn_in']
                           )
    
     return {'accepted_params':param_set,'Log Likelihood':LL,'MLE_particle_dist':MLE_Particles,'MLE_particle_observations':MLE_Observations}
 
-def particlemcmc_internal(data,num_particles,model_dim,init_params,prior,iterations,rng,p_filter):
+def particlemcmc_internal(data,num_particles,model_dim,init_params,init_cov,prior,iterations,rng,p_filter,adaptive,burn_in):
     '''Initialize the particle distribution, observations and weights. 
     
     Args: 
@@ -55,8 +58,7 @@ def particlemcmc_internal(data,num_particles,model_dim,init_params,prior,iterati
     LL = np.zeros((iterations,))
 
     mu = np.zeros(len(init_params))
-    #cov = 0.01 * np.eye(len(init_theta))
-    cov = np.diag(init_params)
+    cov = init_cov
 
     theta[:,0] = init_params
     LL[0] = prior(init_params) 
@@ -64,7 +66,7 @@ def particlemcmc_internal(data,num_particles,model_dim,init_params,prior,iterati
     if(np.isfinite(LL[0])):
         particles,particle_observations,weights,likelihood = p_filter(
                                 data = data,
-                                theta= theta[:,0],
+                                model_params= theta[:,0],
                                 rng = rng)
         
 
@@ -86,19 +88,17 @@ def particlemcmc_internal(data,num_particles,model_dim,init_params,prior,iterati
             print(f"iteration: {iter}" + f"| Acceptance rate: {np.sum(acc_record[:iter])/iter}" + f"| Log-Likelihood: {LL[iter-1]}" + f"| Proposal {theta[:,iter - 1]}")
 
         '''Generating the next proposal using the cholesky decompostion'''
-        cov = np.diag(theta[:,iter - 1])
+
         z = rng.standard_normal((len(theta[:,iter-1])))
         L = cholesky((2.38**2/len(theta[:,iter - 1])) * cov)
-
-        learning_rate = 0.01
-        theta_prop = theta[:,iter - 1] + (learning_rate * L) @ z
+        theta_prop = theta[:,iter - 1] + L @ z
 
         LL_new = prior(theta_prop)
 
         if(np.isfinite(LL_new)):
-            particles,particle_observations,weights,likelihood = filter(
+            particles,particle_observations,weights,likelihood = p_filter(
                                     data = data,
-                                    theta= theta_prop,
+                                    model_params= theta_prop,
                                     rng = rng)
             
             
@@ -119,29 +119,30 @@ def particlemcmc_internal(data,num_particles,model_dim,init_params,prior,iterati
             theta[:,iter] = theta_prop
             LL[iter] = LL_new
             acc_record[iter] = 1
-
-            # if(iter > 1000):
-            #     mu, cov = cov_update(cov,mu,theta[:,iter],iter)
         else: 
             theta[:,iter] = theta[:,iter - 1]
             LL[iter] = LL[iter-1]
 
-
+        if adaptive and (iter > burn_in):
+            mu, cov = cov_update(cov,mu,theta[:,iter],iter,burn_in)
         
 
     return theta,LL,MLE_Particles,MLE_Observations
 
-
-@nb.njit
-def cov_update(cov, mu, theta_val,iteration):
+def cov_update(cov, mu, theta_val,iteration,burn_in):
 
     '''Adaptive update step, geometric cooling g ensures ergodicity of the markov chain 
     as the iteration count goes to infinity. '''
 
-    g = (iteration + 1) ** (-0.4)
+    g = (iteration - burn_in + 1) ** (-0.4)
     mu = (1.0 - g) * mu + g * theta_val
     m_theta = theta_val - mu
-    cov = (1.0 - g) * cov + g * np.outer(m_theta,m_theta.T)
 
-    return mu,cov
+    r_cov = np.eye(len(theta_val))
+    try:
+        r_cov = (1.0 - g) * cov + g * np.outer(m_theta,m_theta.T)
+    except: 
+        print("Covariance Matrix is not positive definite!")
+
+    return mu,r_cov
 

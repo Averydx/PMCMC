@@ -108,32 +108,13 @@ def filter_internal(data:NDArray[np.float64],model_params:NDArray[np.float64],
 
         weights[:,t] -= jacob_sums[-1] #Normalization step
 
-        indices = log_resampling(particles[:,:,t],weights[:,t],rng) #log_resampling returns a list of indices
+        indices = log_resampling(particles[:,:,t],particle_observations[:,:,t],weights[:,t],rng) #log_resampling returns a list of indices
         #particle_observations[:,:,t] = particle_observations[indices,:,t]
 
     return particles,particle_observations,weights,likelihood
 
 @nb.njit
-def resampling(particles,weights,rng): 
-
-    '''Systematic resampling algorithm, the njit decorator is important here as it gives a significant speedup. Time 
-    complexity is O(n), as opposed to O(nlog(n)) in multinomial resampling. '''
-
-    indices = np.zeros(len(weights),dtype = np.int_) #initialize array to hold the indices
-    cdf = np.cumsum(weights) #create cdf
-
-    u = rng.uniform(0,1/len(weights)) #random number between 1 and 1/n, only drawn once vs the n draws in multinomial resampling
-    i = 0
-    for j in range(0,len(weights)): 
-        r = (u + 1/len(weights) * j)
-        while r > cdf[i]: 
-            i += 1
-        indices[j] = i
-
-    return particles[indices,:]
-
-@nb.njit
-def log_resampling(particles,weights,rng): 
+def log_resampling(particles,particle_observations,weights,rng): 
 
     '''Systematic resampling algorithm in log domain, the njit decorator is important here as it gives a significant speedup. Time 
     complexity is O(n), as opposed to O(nlog(n)) in multinomial resampling. '''
@@ -150,6 +131,7 @@ def log_resampling(particles,weights,rng):
         indices[j] = i
 
     particles[:,:] = particles[indices,:] 
+    particle_observations[:,:] = particle_observations[indices,:]
 
     return indices
 
