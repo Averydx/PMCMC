@@ -109,7 +109,6 @@ def filter_internal(data:NDArray[np.float64],model_params:NDArray[np.float64],
         weights[:,t] -= jacob_sums[-1] #Normalization step
 
         indices = log_resampling(particles[:,:,t],particle_observations[:,:,t],weights[:,t],rng) #log_resampling returns a list of indices
-        #particle_observations[:,:,t] = particle_observations[indices,:,t]
 
     return particles,particle_observations,weights,likelihood
 
