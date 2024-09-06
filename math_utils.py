@@ -37,4 +37,6 @@ def nbinom_logpmf(x,n,p):
   coeff = gammaln_nr(n+x) - gammaln_nr(x+1) - gammaln_nr(n)
   return coeff + n*log(p) + x * np.log(-p + 1)
    
-
+@nb.njit(fastmath=True,error_model='numpy')
+def poisson_logpmf(k,mu):
+  return k * log(mu) - gammaln_nr(k + 1) - mu
