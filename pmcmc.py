@@ -129,6 +129,7 @@ def particlemcmc_internal(data,num_particles,model_dim,init_params,init_cov,prio
 
     return theta,LL,MLE_Particles,MLE_Observations
 
+@nb.njit
 def cov_update(cov, mu, theta_val,iteration,burn_in):
 
     '''Adaptive update step, geometric cooling g ensures ergodicity of the markov chain 
@@ -142,7 +143,6 @@ def cov_update(cov, mu, theta_val,iteration,burn_in):
     try:
         r_cov = (1.0 - g) * cov + g * np.outer(m_theta,m_theta.T)
     except: 
-        print("Covariance Matrix is not positive definite!")
-
+        pass
     return mu,r_cov
 
