@@ -89,9 +89,12 @@ def particlemcmc_internal(data,num_particles,model_dim,init_params,init_cov,prio
 
         '''Generating the next proposal using the cholesky decompostion'''
 
-        z = rng.standard_normal((len(theta[:,iter-1])))
-        L = cholesky((2.38**2/len(theta[:,iter - 1])) * cov)
-        theta_prop = theta[:,iter - 1] + L @ z
+        
+        # z = rng.standard_normal((len(theta[:,iter-1])))
+        # L = cholesky((2.38**2/len(theta[:,iter - 1])) * cov)
+        #theta_prop = theta[:,iter - 1] + L @ z
+
+        theta_prop = rng.multivariate_normal(theta[:,iter - 1],(2.38**2/len(theta[:,iter - 1])) * cov)
 
         LL_new = prior(theta_prop)
 
@@ -129,7 +132,6 @@ def particlemcmc_internal(data,num_particles,model_dim,init_params,init_cov,prio
 
     return theta,LL,MLE_Particles,MLE_Observations
 
-@nb.njit
 def cov_update(cov, mu, theta_val,iteration,burn_in):
 
     '''Adaptive update step, geometric cooling g ensures ergodicity of the markov chain 
@@ -138,11 +140,11 @@ def cov_update(cov, mu, theta_val,iteration,burn_in):
     g = (iteration - burn_in + 1) ** (-0.4)
     mu = (1.0 - g) * mu + g * theta_val
     m_theta = theta_val - mu
-
-    r_cov = np.eye(len(theta_val))
-    try:
+ 
+    try: 
         r_cov = (1.0 - g) * cov + g * np.outer(m_theta,m_theta.T)
-    except: 
-        pass
+    except LinAlgError: 
+        r_cov = cov
+
     return mu,r_cov
 
