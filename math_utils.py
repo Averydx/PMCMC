@@ -16,7 +16,6 @@ def gammaln_nr(z):
 
     out=np.empty(z.shape[0])
 
-
     for i in range(z.shape[0]):
       y = z[i]
       tmp = z[i] + 5.24218750000000000
@@ -30,4 +29,12 @@ def gammaln_nr(z):
 
       out[i] = tmp + log(2.5066282746310005 * ser / z[i])
     return out
+
+
+
+@nb.njit(fastmath=True,error_model='numpy')
+def nbinom_logpmf(x,n,p):
+  coeff = gammaln_nr(n+x) - gammaln_nr(x+1) - gammaln_nr(n)
+  return coeff + n*log(p) + x * np.log(-p + 1)
+   
 
