@@ -22,3 +22,6 @@ build/
 .pytest_cache/
 debug.log
 scratch
+
+#CSV data
+.csv
