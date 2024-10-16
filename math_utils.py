@@ -40,3 +40,7 @@ def nbinom_logpmf(x,n,p):
 @nb.njit(fastmath=True,error_model='numpy')
 def poisson_logpmf(k,mu):
   return k * log(mu) - gammaln_nr(k + 1) - mu
+
+@nb.njit(fastmath=True,error_model='numpy')
+def norm_logpmf(k,mu,sig):
+   return - log(sig) -1/2 * log(2 * np.pi) -1/2 * ((k - mu)/sig)**2
